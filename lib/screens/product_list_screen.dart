@@ -19,7 +19,9 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   List<Product> _products = [];
+  final TextEditingController _searchController = TextEditingController();
 
+  String _searchQuery = '';
   bool _isLoading = true;
   String? _errorMessage;
   bool _showPurchasePrice = false;
@@ -27,6 +29,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void initState() {
     super.initState();
     _loadProducts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProducts() async {
@@ -160,7 +168,41 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.trim().toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Clear',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addProduct,
         tooltip: 'Add Product',
@@ -194,7 +236,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
         ),
       );
     }
-
+    final filteredProducts = _products.where((product) {
+      return product.productName.toLowerCase().contains(_searchQuery);
+    }).toList();
+    if (filteredProducts.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 120),
+          Icon(Icons.search_off, size: 56, color: Colors.grey),
+          SizedBox(height: 12),
+          Center(
+            child: Text(
+              'No matching products',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      );
+    }
     if (_products.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadProducts,
@@ -226,9 +286,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
       onRefresh: _loadProducts,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: _products.length,
+        itemCount: filteredProducts.length,
         itemBuilder: (context, index) {
-          final product = _products[index];
+          final product = filteredProducts[index];
 
           return _ProductCard(
             product: product,
