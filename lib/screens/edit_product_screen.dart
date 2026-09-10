@@ -31,12 +31,28 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   bool _isSaving = false;
   final ImagePicker _imagePicker = ImagePicker();
-
+  final TextEditingController _itemCodeController = TextEditingController();
+  String _selectedCategory = 'Other';
   File? _newImage;
   File? _newVideo;
 
   bool _removeImage = false;
   bool _removeVideo = false;
+  static const List<String> _categories = [
+    'Earrings',
+    'Jhumkas',
+    'Necklaces',
+    'Necklace Sets',
+    'Bangles',
+    'Bracelets',
+    'Rings',
+    'Black Beads',
+    'Mangalsutra',
+    'Temple Jewellery',
+    'Antique Jewellery',
+    'Bridal',
+    'Other',
+  ];
   @override
   void initState() {
     super.initState();
@@ -56,6 +72,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _quantityController = TextEditingController(
       text: widget.product.quantity.toString(),
     );
+    _itemCodeController.text = widget.product.itemCode;
+    _selectedCategory = widget.product.category;
   }
 
   @override
@@ -64,7 +82,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _purchasePriceController.dispose();
     _sellingPriceController.dispose();
     _quantityController.dispose();
-
+    _itemCodeController.dispose();
     super.dispose();
   }
 
@@ -200,6 +218,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
     try {
       final updatedProduct = Product(
         id: widget.product.id,
+        itemCode: _itemCodeController.text.trim().toUpperCase(),
+        category: _selectedCategory,
         productName: _productNameController.text.trim(),
         imageUrl: widget.product.imageUrl,
         videoUrl: widget.product.videoUrl,
@@ -354,6 +374,24 @@ class _EditProductScreenState extends State<EditProductScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               TextFormField(
+                controller: _itemCodeController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Item Code',
+                  hintText: 'Example: JH-0001',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final code = value?.trim() ?? '';
+
+                  if (code.isEmpty) {
+                    return 'Please enter item code';
+                  }
+
+                  return null;
+                },
+              ),
+              TextFormField(
                 controller: _productNameController,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
@@ -364,7 +402,30 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   return _validateRequired(value, 'Product name');
                 },
               ),
+              const SizedBox(height: 16),
 
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                ),
+                items: _categories.map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
+              ),
               const SizedBox(height: 16),
 
               TextFormField(

@@ -25,6 +25,22 @@ class _ProductListScreenState extends State<ProductListScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _showPurchasePrice = false;
+  String? _selectedCategory;
+  static const List<String> _categories = [
+    'Earrings',
+    'Jhumkas',
+    'Necklaces',
+    'Necklace Sets',
+    'Bangles',
+    'Bracelets',
+    'Rings',
+    'Black Beads',
+    'Mangalsutra',
+    'Temple Jewellery',
+    'Antique Jewellery',
+    'Bridal',
+    'Other',
+  ];
   @override
   void initState() {
     super.initState();
@@ -35,6 +51,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  List<Product> get _filteredProducts {
+    final query = _searchQuery.trim().toLowerCase();
+
+    return _products.where((product) {
+      final matchesSearch =
+          query.isEmpty ||
+          product.itemCode.toLowerCase().contains(query) ||
+          product.productName.toLowerCase().contains(query) ||
+          product.category.toLowerCase().contains(query);
+
+      final matchesCategory =
+          _selectedCategory == null || product.category == _selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    }).toList();
   }
 
   Future<void> _loadProducts() async {
@@ -171,20 +204,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
                 setState(() {
-                  _searchQuery = value.trim().toLowerCase();
+                  _searchQuery = value;
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search products...',
+                hintText: 'Search item code or product name',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        tooltip: 'Clear',
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
@@ -192,12 +225,45 @@ class _ProductListScreenState extends State<ProductListScreen> {
                             _searchQuery = '';
                           });
                         },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                      ),
+                border: const OutlineInputBorder(),
               ),
+            ),
+          ),
+
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: const Text('All'),
+                    selected: _selectedCategory == null,
+                    onSelected: (_) {
+                      setState(() {
+                        _selectedCategory = null;
+                      });
+                    },
+                  ),
+                ),
+                ..._categories.map(
+                  (category) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: _selectedCategory == category,
+                      onSelected: (_) {
+                        setState(() {
+                          _selectedCategory = category;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(child: _buildBody()),
@@ -215,7 +281,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
+    if (_products.isNotEmpty && _filteredProducts.isEmpty) {
+      return const Center(child: Text('No matching products'));
+    }
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -236,9 +304,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         ),
       );
     }
-    final filteredProducts = _products.where((product) {
-      return product.productName.toLowerCase().contains(_searchQuery);
-    }).toList();
+    final filteredProducts = _filteredProducts;
     if (filteredProducts.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -354,6 +420,25 @@ class _ProductCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      product.itemCode,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      product.category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
                     Text(
                       product.productName,
                       maxLines: 2,

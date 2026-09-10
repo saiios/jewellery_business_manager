@@ -27,13 +27,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
   File? _selectedImage;
   File? _selectedVideo;
   bool _isSaving = false;
+  final TextEditingController _itemCodeController = TextEditingController();
 
+  String _selectedCategory = 'Other';
+  static const List<String> _categories = [
+    'Earrings',
+    'Jhumkas',
+    'Necklaces',
+    'Necklace Sets',
+    'Bangles',
+    'Bracelets',
+    'Rings',
+    'Black Beads',
+    'Mangalsutra',
+    'Temple Jewellery',
+    'Antique Jewellery',
+    'Bridal',
+    'Other',
+  ];
   @override
   void dispose() {
     _productNameController.dispose();
     _purchasePriceController.dispose();
     _sellingPriceController.dispose();
     _quantityController.dispose();
+    _itemCodeController.dispose();
     super.dispose();
   }
 
@@ -211,6 +229,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final product = Product(
         id: '',
+        itemCode: _itemCodeController.text.trim().toUpperCase(),
+        category: _selectedCategory,
         productName: _productNameController.text.trim(),
         purchasePrice: double.parse(_purchasePriceController.text.trim()),
         sellingPrice: double.parse(_sellingPriceController.text.trim()),
@@ -256,7 +276,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         const SnackBar(content: Text('Product added successfully')),
       );
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
 
@@ -364,6 +384,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               ],
               TextFormField(
+                controller: _itemCodeController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Item Code',
+                  hintText: 'Example: JH-0001',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final code = value?.trim() ?? '';
+
+                  if (code.isEmpty) {
+                    return 'Please enter item code';
+                  }
+
+                  return null;
+                },
+              ),
+              TextFormField(
                 controller: _productNameController,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
@@ -373,7 +411,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 validator: _validateProductName,
               ),
+              const SizedBox(height: 16),
 
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                ),
+                items: _categories.map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
+              ),
               const SizedBox(height: 16),
 
               TextFormField(

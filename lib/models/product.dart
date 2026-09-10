@@ -1,6 +1,8 @@
 class Product {
   final String id;
+  final String itemCode;
   final String productName;
+  final String category;
   final String? imageUrl;
   final String? videoUrl;
   final double purchasePrice;
@@ -12,7 +14,9 @@ class Product {
 
   const Product({
     required this.id,
+    required this.itemCode,
     required this.productName,
+    required this.category,
     this.imageUrl,
     this.videoUrl,
     required this.purchasePrice,
@@ -26,7 +30,9 @@ class Product {
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
       id: map['id'] as String,
+      itemCode: map['item_code'] as String,
       productName: map['product_name'] as String,
+      category: map['category'] as String,
       imageUrl: map['image_url'] as String?,
       videoUrl: map['video_url'] as String?,
       purchasePrice: (map['purchase_price'] as num).toDouble(),
@@ -40,7 +46,9 @@ class Product {
 
   Map<String, dynamic> toInsertMap() {
     return {
+      'item_code': itemCode,
       'product_name': productName,
+      'category': category,
       'image_url': imageUrl,
       'video_url': videoUrl,
       'purchase_price': purchasePrice,
@@ -51,7 +59,9 @@ class Product {
 
   Map<String, dynamic> toUpdateMap() {
     return {
+      'item_code': itemCode,
       'product_name': productName,
+      'category': category,
       'image_url': imageUrl,
       'video_url': videoUrl,
       'purchase_price': purchasePrice,
