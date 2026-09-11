@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:jewel_admin/screens/business_summary_screen.dart';
 import 'package:jewel_admin/screens/edit_product_screen.dart';
 import 'package:jewel_admin/screens/product_details_screen.dart';
 import 'package:jewel_admin/services/whatsapp_service.dart';
@@ -193,6 +194,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 },
               ),
             ],
+          ),
+          IconButton(
+            tooltip: 'Business Summary',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      BusinessSummaryScreen(repository: widget.repository),
+                ),
+              );
+            },
+            icon: const Icon(Icons.analytics_outlined),
           ),
           IconButton(
             tooltip: 'Refresh',

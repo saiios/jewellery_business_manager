@@ -3,7 +3,6 @@ import 'package:jewel_admin/screens/product_list_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'repositories/product_repository.dart';
-import 'screens/add_product_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,9 +29,7 @@ class JewelAdminApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Jewel Admin',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.pink),
-      home: ProductListScreen(
-        repository: ProductRepository(Supabase.instance.client),
-      ),
+      home: ProductListScreen(repository: repository),
     );
   }
 }

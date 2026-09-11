@@ -1,3 +1,4 @@
+import 'package:jewel_admin/models/inventory_summary.dart';
 import 'package:jewel_admin/services/storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -76,18 +77,53 @@ class ProductRepository {
     return Product.fromMap(response);
   }
 
+  Future<InventorySummary> getInventorySummary() async {
+    final response = await supabase
+        .from('products')
+        .select('purchase_price, selling_price, quantity, category');
+
+    final products = response as List;
+
+    double currentStockPurchaseValue = 0;
+    double expectedSalesValue = 0;
+    int itemsRemaining = 0;
+
+    final categoriesWithStock = <String>{};
+
+    for (final item in products) {
+      final purchasePrice = (item['purchase_price'] as num).toDouble();
+      final sellingPrice = (item['selling_price'] as num).toDouble();
+      final quantity = item['quantity'] as int;
+      final category = item['category'] as String;
+
+      if (quantity > 0) {
+        currentStockPurchaseValue += purchasePrice * quantity;
+        expectedSalesValue += sellingPrice * quantity;
+        itemsRemaining += quantity;
+
+        categoriesWithStock.add(category);
+      }
+    }
+
+    return InventorySummary(
+      currentStockPurchaseValue: currentStockPurchaseValue,
+      expectedSalesValue: expectedSalesValue,
+      potentialProfit: expectedSalesValue - currentStockPurchaseValue,
+      itemsRemaining: itemsRemaining,
+      productDesigns: products.length,
+      categories: categoriesWithStock.length,
+    );
+  }
+
   Future<void> deleteProduct(String id) async {
     final product = await getProduct(id);
 
     final storageService = StorageService(supabase);
 
-    // Delete image from Storage if it exists.
     await storageService.deleteProductMedia(product.imageUrl);
 
-    // Delete video from Storage if it exists.
     await storageService.deleteProductMedia(product.videoUrl);
 
-    // Finally delete the database record.
     await supabase.from('products').delete().eq('id', id);
   }
 }

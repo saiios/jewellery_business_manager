@@ -46,7 +46,8 @@ class Product {
 
   Map<String, dynamic> toInsertMap() {
     return {
-      'item_code': itemCode,
+      // Do NOT send item_code.
+      // Supabase generates JW-XXXX automatically.
       'product_name': productName,
       'category': category,
       'image_url': imageUrl,
