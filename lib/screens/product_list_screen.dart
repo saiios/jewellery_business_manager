@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:jewel_admin/screens/add_sale_screen.dart';
 import 'package:jewel_admin/screens/business_summary_screen.dart';
 import 'package:jewel_admin/screens/edit_product_screen.dart';
 import 'package:jewel_admin/screens/product_details_screen.dart';
@@ -194,6 +195,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 },
               ),
             ],
+          ),
+          IconButton(
+            tooltip: 'New Sale',
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AddSaleScreen(repository: widget.repository),
+                ),
+              );
+
+              if (result == true && mounted) {
+                await _loadProducts();
+              }
+            },
+            icon: const Icon(Icons.point_of_sale_outlined),
           ),
           IconButton(
             tooltip: 'Business Summary',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jewel_admin/screens/sales_history_screen.dart';
 
 import '../models/inventory_summary.dart';
 import '../repositories/product_repository.dart';
@@ -14,7 +15,9 @@ class BusinessSummaryScreen extends StatefulWidget {
 
 class _BusinessSummaryScreenState extends State<BusinessSummaryScreen> {
   InventorySummary? _summary;
+
   bool _isLoading = true;
+
   String? _errorMessage;
 
   @override
@@ -105,34 +108,150 @@ class _BusinessSummaryScreenState extends State<BusinessSummaryScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
+        // ========================================================
+        // ACTUAL SALES
+        // ========================================================
+        Text('Sales', style: Theme.of(context).textTheme.titleLarge),
+
+        const SizedBox(height: 12),
+
+        _buildClickableMoneyCard(
+          title: 'Total Sales Revenue',
+          amount: _formatAmount(summary.totalSalesRevenue),
+          subtitle: 'Actual money recorded from completed sales',
+          icon: Icons.currency_rupee,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SalesHistoryScreen(repository: widget.repository),
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildClickableMoneyCard(
+          title: 'Realized Profit',
+          amount: _formatAmount(summary.realizedProfit),
+          subtitle: 'Actual sales revenue minus cost of items sold',
+          icon: Icons.trending_up,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SalesHistoryScreen(repository: widget.repository),
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildClickableMoneyCard(
+          title: 'Cost of Sold Items',
+          amount: _formatAmount(summary.totalCostOfSoldItems),
+          subtitle: 'Purchase cost of jewellery already sold',
+          icon: Icons.shopping_cart_checkout,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SalesHistoryScreen(repository: widget.repository),
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: _buildClickableOverviewCard(
+                icon: Icons.receipt_long_outlined,
+                value: summary.totalSales.toString(),
+                label: 'Sales',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SalesHistoryScreen(repository: widget.repository),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildClickableOverviewCard(
+                icon: Icons.sell_outlined,
+                value: summary.itemsSold.toString(),
+                label: 'Items Sold',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SalesHistoryScreen(repository: widget.repository),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // ========================================================
+        // CURRENT STOCK
+        // ========================================================
+        Text('Current Stock', style: Theme.of(context).textTheme.titleLarge),
+
+        const SizedBox(height: 12),
+
         _buildMainMoneyCard(
-          title: 'Current Stock Value',
+          title: 'Current Stock Cost',
           amount: _formatAmount(summary.currentStockPurchaseValue),
-          subtitle: 'What you invested in jewellery still in stock',
+          subtitle: 'Purchase cost of jewellery still in stock',
           icon: Icons.inventory_2_outlined,
         ),
+
         const SizedBox(height: 12),
+
         _buildMainMoneyCard(
-          title: 'Expected Sales Value',
-          amount: _formatAmount(summary.expectedSalesValue),
-          subtitle: 'What you could receive if all current stock is sold',
+          title: 'Current Stock Selling Value',
+          amount: _formatAmount(summary.currentStockSellingValue),
+          subtitle: 'Value using each product\'s current selling price',
           icon: Icons.sell_outlined,
         ),
+
         const SizedBox(height: 12),
+
         _buildMainMoneyCard(
-          title: 'Potential Profit',
+          title: 'Potential Profit on Remaining Stock',
           amount: _formatAmount(summary.potentialProfit),
-          subtitle: 'Expected sales value minus current stock cost',
+          subtitle: 'Current stock selling value minus stock cost',
           icon: Icons.trending_up,
         ),
+
         const SizedBox(height: 20),
+
         Text('Stock Overview', style: Theme.of(context).textTheme.titleLarge),
+
         const SizedBox(height: 12),
+
         Row(
           children: [
             Expanded(
               child: _buildOverviewCard(
-                icon: Icons.shopping_bag_outlined,
+                icon: Icons.inventory_2_outlined,
                 value: summary.itemsRemaining.toString(),
                 label: 'Items Remaining',
               ),
@@ -147,16 +266,83 @@ class _BusinessSummaryScreenState extends State<BusinessSummaryScreen> {
             ),
           ],
         ),
+
         const SizedBox(height: 12),
+
         _buildOverviewCard(
           icon: Icons.category_outlined,
           value: summary.categories.toString(),
           label: 'Categories With Stock',
           fullWidth: true,
         ),
+
         const SizedBox(height: 24),
+
         _buildInfoCard(),
       ],
+    );
+  }
+
+  Widget _buildClickableMoneyCard({
+    required String title,
+    required String amount,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: _buildMainMoneyCard(
+          title: title,
+          amount: amount,
+          subtitle: subtitle,
+          icon: icon,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClickableOverviewCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 28,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(label, style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -258,9 +444,10 @@ class _BusinessSummaryScreenState extends State<BusinessSummaryScreen> {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'This summary shows the value of jewellery currently in stock. '
-                'Sales, expenses and actual profit will be added when those '
-                'features are implemented.',
+                'Realized Profit is based only on completed sales '
+                'and the actual sold price recorded for each item. '
+                'Remaining stock is valued using the current selling '
+                'price entered for each product.',
               ),
             ),
           ],
