@@ -21,13 +21,22 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   List<Product> _products = [];
+
   final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
+
   bool _isLoading = true;
   String? _errorMessage;
+
   bool _showPurchasePrice = false;
+
   String? _selectedCategory;
+
+  String _stockFilter = 'All';
+
+  String _sortOption = 'Newest';
+
   static const List<String> _categories = [
     'Earrings',
     'Jhumkas',
@@ -43,6 +52,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
     'Bridal',
     'Other',
   ];
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +68,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   List<Product> get _filteredProducts {
     final query = _searchQuery.trim().toLowerCase();
 
-    return _products.where((product) {
+    final filtered = _products.where((product) {
       final matchesSearch =
           query.isEmpty ||
           product.itemCode.toLowerCase().contains(query) ||
@@ -68,8 +78,31 @@ class _ProductListScreenState extends State<ProductListScreen> {
       final matchesCategory =
           _selectedCategory == null || product.category == _selectedCategory;
 
-      return matchesSearch && matchesCategory;
+      final matchesStock = switch (_stockFilter) {
+        'Available' => product.quantity > 0,
+        'Sold Out' => product.quantity == 0,
+        _ => true,
+      };
+
+      return matchesSearch && matchesCategory && matchesStock;
     }).toList();
+
+    switch (_sortOption) {
+      case 'Price: Low → High':
+        filtered.sort((a, b) => a.sellingPrice.compareTo(b.sellingPrice));
+        break;
+
+      case 'Price: High → Low':
+        filtered.sort((a, b) => b.sellingPrice.compareTo(a.sellingPrice));
+        break;
+
+      case 'Newest':
+      default:
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+    }
+
+    return filtered;
   }
 
   Future<void> _loadProducts() async {
@@ -118,7 +151,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
         return AlertDialog(
           title: const Text('Delete Product?'),
           content: Text(
-            'Are you sure you want to delete "${product.productName}"?',
+            'Are you sure you want to delete '
+            '"${product.productName}"?',
           ),
           actions: [
             TextButton(
@@ -176,6 +210,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
+  Future<void> _openProductDetails(Product product) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailsScreen(
+          repository: widget.repository,
+          product: product,
+          showPurchasePrice: _showPurchasePrice,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      await _loadProducts();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -196,6 +247,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ),
             ],
           ),
+
           IconButton(
             tooltip: 'New Sale',
             onPressed: () async {
@@ -213,6 +265,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             },
             icon: const Icon(Icons.point_of_sale_outlined),
           ),
+
           IconButton(
             tooltip: 'Business Summary',
             onPressed: () async {
@@ -226,6 +279,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             },
             icon: const Icon(Icons.analytics_outlined),
           ),
+
           IconButton(
             tooltip: 'Refresh',
             onPressed: _isLoading ? null : _loadProducts,
@@ -233,6 +287,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
+
       body: Column(
         children: [
           Padding(
@@ -253,6 +308,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
+
                           setState(() {
                             _searchQuery = '';
                           });
@@ -263,6 +319,29 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
 
+          /*
+           * ------------------------------------------------------
+           * STOCK FILTER
+           * ------------------------------------------------------
+           */
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildStockChip('All'),
+                _buildStockChip('Available'),
+                _buildStockChip('Sold Out'),
+              ],
+            ),
+          ),
+
+          /*
+           * ------------------------------------------------------
+           * CATEGORY FILTER
+           * ------------------------------------------------------
+           */
           SizedBox(
             height: 48,
             child: ListView(
@@ -272,7 +351,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: const Text('All'),
+                    label: const Text('All Categories'),
                     selected: _selectedCategory == null,
                     onSelected: (_) {
                       setState(() {
@@ -298,9 +377,55 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ],
             ),
           ),
+
+          /*
+           * ------------------------------------------------------
+           * SORT
+           * ------------------------------------------------------
+           */
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Row(
+              children: [
+                const Icon(Icons.sort, size: 20),
+                const SizedBox(width: 8),
+                const Text('Sort by'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _sortOption,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Newest', child: Text('Newest')),
+                      DropdownMenuItem(
+                        value: 'Price: Low → High',
+                        child: Text('Price: Low → High'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Price: High → Low',
+                        child: Text('Price: High → Low'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setState(() {
+                        _sortOption = value;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           Expanded(child: _buildBody()),
         ],
       ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: _addProduct,
         tooltip: 'Add Product',
@@ -309,13 +434,26 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 
+  Widget _buildStockChip(String value) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(value),
+        selected: _stockFilter == value,
+        onSelected: (_) {
+          setState(() {
+            _stockFilter = value;
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_products.isNotEmpty && _filteredProducts.isEmpty) {
-      return const Center(child: Text('No matching products'));
-    }
+
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -336,23 +474,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         ),
       );
     }
-    final filteredProducts = _filteredProducts;
-    if (filteredProducts.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 120),
-          Icon(Icons.search_off, size: 56, color: Colors.grey),
-          SizedBox(height: 12),
-          Center(
-            child: Text(
-              'No matching products',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      );
-    }
+
     if (_products.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadProducts,
@@ -371,12 +493,32 @@ class _ProductListScreenState extends State<ProductListScreen> {
             SizedBox(height: 8),
             Center(
               child: Text(
-                'Tap + to add your first jewellery product.',
+                'Tap + to add your first '
+                'jewellery product.',
                 textAlign: TextAlign.center,
               ),
             ),
           ],
         ),
+      );
+    }
+
+    final filteredProducts = _filteredProducts;
+
+    if (filteredProducts.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 120),
+          Icon(Icons.search_off, size: 56, color: Colors.grey),
+          SizedBox(height: 12),
+          Center(
+            child: Text(
+              'No matching products',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       );
     }
 
@@ -399,23 +541,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
     );
   }
-
-  Future<void> _openProductDetails(Product product) async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductDetailsScreen(
-          repository: widget.repository,
-          product: product,
-          showPurchasePrice: _showPurchasePrice,
-        ),
-      ),
-    );
-
-    if (result == true) {
-      await _loadProducts();
-    }
-  }
 }
 
 class _ProductCard extends StatelessWidget {
@@ -424,6 +549,7 @@ class _ProductCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onTap;
+
   const _ProductCard({
     required this.product,
     required this.showPurchasePrice,
@@ -447,7 +573,9 @@ class _ProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _ProductImage(imageUrl: product.imageUrl),
+
               const SizedBox(width: 12),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,6 +599,7 @@ class _ProductCard extends StatelessWidget {
                     ),
 
                     const SizedBox(height: 4),
+
                     Text(
                       product.productName,
                       maxLines: 2,
@@ -524,7 +653,9 @@ class _ProductCard extends StatelessWidget {
                             try {
                               await WhatsAppService.shareProduct(product);
                             } catch (error) {
-                              if (!context.mounted) return;
+                              if (!context.mounted) {
+                                return;
+                              }
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -536,11 +667,13 @@ class _ProductCard extends StatelessWidget {
                             }
                           },
                         ),
+
                         IconButton(
                           tooltip: 'Edit',
                           onPressed: onEdit,
                           icon: const Icon(Icons.edit_outlined),
                         ),
+
                         IconButton(
                           tooltip: 'Delete',
                           onPressed: onDelete,

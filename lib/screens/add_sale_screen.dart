@@ -36,14 +36,18 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _customerNameController = TextEditingController();
+
   final _customerMobileController = TextEditingController();
+
   final _notesController = TextEditingController();
 
   final List<_SaleLine> _lines = [];
 
   List<Product> _products = [];
+
   bool _isLoadingProducts = true;
   bool _isSaving = false;
+
   String? _errorMessage;
 
   String _paymentMethod = 'Cash';
@@ -88,6 +92,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
       setState(() {
         _products = products.where((product) => product.quantity > 0).toList();
+
         _isLoadingProducts = false;
       });
     } catch (e) {
@@ -113,6 +118,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No more products available to add.')),
       );
+
       return;
     }
 
@@ -121,69 +127,13 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.75,
-            child: Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Select Product',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: availableProducts.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final product = availableProducts[index];
-
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(
-                            product.itemCode.substring(
-                              0,
-                              product.itemCode.length > 2
-                                  ? 2
-                                  : product.itemCode.length,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          product.productName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          '${product.itemCode} • ${product.category}\n'
-                          'Stock: ${product.quantity} • '
-                          'Selling price: ₹${product.sellingPrice.toStringAsFixed(2)}',
-                        ),
-                        isThreeLine: true,
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.pop(context, product);
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        return _ProductSelectionSheet(products: availableProducts);
       },
     );
 
-    if (product == null || !mounted) return;
+    if (product == null || !mounted) {
+      return;
+    }
 
     setState(() {
       _lines.add(_SaleLine(product: product));
@@ -204,11 +154,12 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Only ${line.product.quantity} available for '
-            '${line.product.itemCode}.',
+            'Only ${line.product.quantity} available '
+            'for ${line.product.itemCode}.',
           ),
         ),
       );
+
       return;
     }
 
@@ -230,6 +181,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least one product to the sale.')),
       );
+
       return;
     }
 
@@ -244,19 +196,25 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Invalid actual sold price for ${line.product.itemCode}.',
+              'Invalid actual sold price for '
+              '${line.product.itemCode}.',
             ),
           ),
         );
+
         return;
       }
 
       if (line.quantity > line.product.quantity) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Insufficient stock for ${line.product.itemCode}.'),
+            content: Text(
+              'Insufficient stock for '
+              '${line.product.itemCode}.',
+            ),
           ),
         );
+
         return;
       }
     }
@@ -300,7 +258,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                 Text('Sale Completed'),
               ],
             ),
-            content: Text('Sale ${sale.saleNumber} was recorded successfully.'),
+            content: Text(
+              'Sale ${sale.saleNumber} '
+              'was recorded successfully.',
+            ),
             actions: [
               FilledButton(
                 onPressed: () {
@@ -325,7 +286,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Unable to complete sale: ${_cleanError(e)}'),
+          content: Text(
+            'Unable to complete sale: '
+            '${_cleanError(e)}',
+          ),
           duration: const Duration(seconds: 5),
         ),
       );
@@ -340,6 +304,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
         RegExp(r'^.*Insufficient stock'),
         'Insufficient stock',
       );
+    }
+
+    if (text.contains('same product cannot be added')) {
+      return 'The same product cannot be added '
+          'more than once to a sale.';
     }
 
     return text;
@@ -421,7 +390,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _selectProduct,
+                  onPressed: _isSaving ? null : _selectProduct,
                   icon: const Icon(Icons.add),
                   label: const Text('Add Product'),
                 ),
@@ -448,7 +417,8 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Tap Add Product to start the sale.',
+                      'Tap Add Product to '
+                      'start the sale.',
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -497,7 +467,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text('Available stock: ${product.quantity}'),
+                      Text(
+                        'Available stock: '
+                        '${product.quantity}',
+                      ),
                     ],
                   ),
                 ),
@@ -577,7 +550,8 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                'Line Total: ₹${line.lineTotal.toStringAsFixed(2)}',
+                'Line Total: '
+                '₹${line.lineTotal.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -656,7 +630,9 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               onChanged: _isSaving
                   ? null
                   : (value) {
-                      if (value == null) return;
+                      if (value == null) {
+                        return;
+                      }
 
                       setState(() {
                         _paymentMethod = value;
@@ -732,6 +708,183 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductSelectionSheet extends StatefulWidget {
+  final List<Product> products;
+
+  const _ProductSelectionSheet({required this.products});
+
+  @override
+  State<_ProductSelectionSheet> createState() => _ProductSelectionSheetState();
+}
+
+class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
+  final TextEditingController _searchController = TextEditingController();
+
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Product> get _filteredProducts {
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return widget.products;
+    }
+
+    return widget.products.where((product) {
+      return product.itemCode.toLowerCase().contains(query) ||
+          product.productName.toLowerCase().contains(query) ||
+          product.category.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final products = _filteredProducts;
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.82,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Select Product',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search item code, name or category',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        ),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${products.length} product'
+                  '${products.length == 1 ? '' : 's'} available',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+
+            Expanded(
+              child: products.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.separated(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      itemCount: products.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final product = products[index];
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            child: Text(
+                              product.itemCode.substring(
+                                0,
+                                product.itemCode.length > 2
+                                    ? 2
+                                    : product.itemCode.length,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            product.productName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${product.itemCode} • '
+                            '${product.category}\n'
+                            'Stock: '
+                            '${product.quantity} • '
+                            'Selling price: '
+                            '₹${product.sellingPrice.toStringAsFixed(2)}',
+                          ),
+                          isThreeLine: true,
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.pop(context, product);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off, size: 48),
+            const SizedBox(height: 12),
+            const Text(
+              'No products found',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Try a different item code, '
+              'product name or category.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );

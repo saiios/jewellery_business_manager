@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/product.dart';
+import '../models/sale_item.dart';
 import '../repositories/product_repository.dart';
 import '../services/whatsapp_service.dart';
 import 'edit_product_screen.dart';
+import 'sale_details_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final ProductRepository repository;
@@ -26,10 +28,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   VideoPlayerController? _videoController;
   Future<void>? _videoInitialization;
 
+  List<SaleItem> _sales = [];
+  bool _salesLoading = true;
+  String? _salesError;
+
   @override
   void initState() {
     super.initState();
     _initializeVideo();
+    _loadSalesHistory();
   }
 
   void _initializeVideo() {
@@ -42,6 +49,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
 
     _videoInitialization = _videoController!.initialize();
+  }
+
+  Future<void> _loadSalesHistory() async {
+    setState(() {
+      _salesLoading = true;
+      _salesError = null;
+    });
+
+    try {
+      final sales = await widget.repository.getProductSales(widget.product.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        _sales = sales;
+        _salesLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _salesLoading = false;
+        _salesError = error.toString();
+      });
+    }
   }
 
   @override
@@ -76,6 +108,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (result == true && mounted) {
       Navigator.pop(context, true);
     }
+  }
+
+  void _openSaleDetails(String saleId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            SaleDetailsScreen(repository: widget.repository, saleId: saleId),
+      ),
+    );
   }
 
   void _openFullImage() {
@@ -284,6 +326,28 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
           const SizedBox(height: 16),
 
+          Text(
+            'Item Code',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            product.itemCode,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 14),
+
+          Text(
+            'Category',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            product.category,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 14),
+
           if (widget.showPurchasePrice) ...[
             Text(
               'Purchase Price',
@@ -342,6 +406,178 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  Widget _buildSalesHistory() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Sales History',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              if (_sales.isNotEmpty)
+                Text(
+                  '${_sales.fold<int>(0, (sum, item) => sum + item.quantity)} sold',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (_salesLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_salesError != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Unable to load sales history.')),
+                    TextButton(
+                      onPressed: _loadSalesHistory,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_sales.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No sales recorded for this product yet.',
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._sales.map(_buildSaleHistoryItem),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaleHistoryItem(SaleItem saleItem) {
+    final saleDate = saleItem.createdAt.toLocal();
+
+    final saleDateText =
+        '${saleDate.day.toString().padLeft(2, '0')}/'
+        '${saleDate.month.toString().padLeft(2, '0')}/'
+        '${saleDate.year}';
+
+    final profit = saleItem.profit;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openSaleDetails(saleItem.saleId),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      saleDateText,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Text(
+                    '₹${saleItem.lineTotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Expanded(child: Text('Qty: ${saleItem.quantity}')),
+                  Expanded(
+                    child: Text(
+                      'Sold: ₹${saleItem.sellingPrice.toStringAsFixed(0)}',
+                    ),
+                  ),
+                ],
+              ),
+
+              if (widget.showPurchasePrice) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Cost: ₹${saleItem.purchasePrice.toStringAsFixed(0)}',
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Profit: ₹${profit.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: profit >= 0 ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Text(
+                    'View sale details',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right, size: 20),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActions() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -371,15 +607,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Product Details')),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildImage(),
-            _buildVideo(),
-            _buildInformation(),
-            _buildActions(),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _loadSalesHistory,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildImage(),
+              _buildVideo(),
+              _buildInformation(),
+              _buildSalesHistory(),
+              _buildActions(),
+            ],
+          ),
         ),
       ),
     );
