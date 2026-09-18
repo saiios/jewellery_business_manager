@@ -29,7 +29,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   late final TextEditingController _purchasePriceController;
   late final TextEditingController _sellingPriceController;
   late final TextEditingController _quantityController;
-
+  late final TextEditingController _mrpController;
   bool _isSaving = false;
   final ImagePicker _imagePicker = ImagePicker();
   final TextEditingController _itemCodeController = TextEditingController();
@@ -65,7 +65,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _purchasePriceController = TextEditingController(
       text: widget.product.purchasePrice.toStringAsFixed(2),
     );
-
+    _mrpController = TextEditingController(
+      text: widget.product.mrp.toStringAsFixed(2),
+    );
     _sellingPriceController = TextEditingController(
       text: widget.product.sellingPrice.toStringAsFixed(2),
     );
@@ -84,6 +86,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _sellingPriceController.dispose();
     _quantityController.dispose();
     _itemCodeController.dispose();
+    _mrpController.dispose();
     super.dispose();
   }
 
@@ -242,6 +245,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         videoUrl: widget.product.videoUrl,
         purchasePrice: double.parse(_purchasePriceController.text.trim()),
         sellingPrice: double.parse(_sellingPriceController.text.trim()),
+        mrp: double.parse(_mrpController.text.trim()),
         quantity: int.parse(_quantityController.text.trim()),
         status: widget.product.status,
         createdAt: widget.product.createdAt,
@@ -408,6 +412,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
               TextFormField(
                 controller: _productNameController,
                 textCapitalization: TextCapitalization.words,
@@ -462,6 +468,23 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
               const SizedBox(height: 16),
 
+              TextFormField(
+                controller: _mrpController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'MRP',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                  helperText: 'Actual / displayed price before offer',
+                ),
+                validator: (value) {
+                  return _validatePrice(value, 'MRP');
+                },
+              ),
+
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _sellingPriceController,
                 keyboardType: const TextInputType.numberWithOptions(

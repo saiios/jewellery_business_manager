@@ -638,13 +638,41 @@ class _ProductCard extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
 
-                    Text(
-                      'Selling: ₹${product.sellingPrice.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    if (product.mrp > product.sellingPrice) ...[
+                      Row(
+                        children: [
+                          Text(
+                            '₹${product.mrp.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '₹${product.sellingPrice.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _DiscountBadge(
+                            mrp: product.mrp,
+                            sellingPrice: product.sellingPrice,
+                          ),
+                        ],
                       ),
-                    ),
+                    ] else ...[
+                      Text(
+                        'MRP: ₹${product.mrp.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 6),
 
@@ -708,6 +736,38 @@ class _ProductCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscountBadge extends StatelessWidget {
+  final double mrp;
+  final double sellingPrice;
+
+  const _DiscountBadge({required this.mrp, required this.sellingPrice});
+
+  @override
+  Widget build(BuildContext context) {
+    if (mrp <= 0 || sellingPrice >= mrp) {
+      return const SizedBox.shrink();
+    }
+
+    final discount = ((mrp - sellingPrice) / mrp * 100).round();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$discount% OFF',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.green.shade700,
         ),
       ),
     );

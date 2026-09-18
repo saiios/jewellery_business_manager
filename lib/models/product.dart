@@ -7,6 +7,7 @@ class Product {
   final String? videoUrl;
   final double purchasePrice;
   final double sellingPrice;
+  final double mrp;
   final int quantity;
   final String status;
   final DateTime createdAt;
@@ -21,6 +22,7 @@ class Product {
     this.videoUrl,
     required this.purchasePrice,
     required this.sellingPrice,
+    required this.mrp,
     required this.quantity,
     required this.status,
     required this.createdAt,
@@ -37,6 +39,7 @@ class Product {
       videoUrl: map['video_url'] as String?,
       purchasePrice: (map['purchase_price'] as num).toDouble(),
       sellingPrice: (map['selling_price'] as num).toDouble(),
+      mrp: (map['mrp'] as num?)?.toDouble() ?? 0.0,
       quantity: map['quantity'] as int,
       status: map['status'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
@@ -52,6 +55,7 @@ class Product {
       'category': category,
       'image_url': imageUrl,
       'video_url': videoUrl,
+      'mrp': mrp,
       'purchase_price': purchasePrice,
       'selling_price': sellingPrice,
       'quantity': quantity,
@@ -65,6 +69,7 @@ class Product {
       'category': category,
       'image_url': imageUrl,
       'video_url': videoUrl,
+      'mrp': mrp,
       'purchase_price': purchasePrice,
       'selling_price': sellingPrice,
       'quantity': quantity,

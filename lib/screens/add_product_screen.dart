@@ -23,7 +23,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _productNameController = TextEditingController();
   final _purchasePriceController = TextEditingController();
   final _sellingPriceController = TextEditingController();
-  final _quantityController = TextEditingController(text: '0');
+  final _mrpController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
   final ImagePicker _imagePicker = ImagePicker();
   File? _selectedImage;
   File? _selectedVideo;
@@ -50,6 +51,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _productNameController.dispose();
     _purchasePriceController.dispose();
     _sellingPriceController.dispose();
+    _mrpController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -233,6 +235,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         productName: _productNameController.text.trim(),
         purchasePrice: double.parse(_purchasePriceController.text.trim()),
         sellingPrice: double.parse(_sellingPriceController.text.trim()),
+        mrp: double.parse(_mrpController.text.trim()),
         quantity: int.parse(_quantityController.text.trim()),
         status: '',
         createdAt: DateTime.now(),
@@ -470,6 +473,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               const SizedBox(height: 16),
 
+              TextFormField(
+                controller: _mrpController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'MRP',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                  helperText: 'Actual / displayed price before offer',
+                ),
+                validator: _validatePrice,
+              ),
+
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _sellingPriceController,
                 keyboardType: const TextInputType.numberWithOptions(
