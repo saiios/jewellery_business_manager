@@ -248,6 +248,65 @@ class ProductRepository {
 
     return Sale.fromMap(Map<String, dynamic>.from(saleResponse), items: items);
   }
+  // ============================================================
+  // PRODUCT MEDIA
+  // ============================================================
+
+  Future<List<Map<String, dynamic>>> getProductImages(String productId) async {
+    final response = await supabase
+        .from('product_images')
+        .select('id, product_id, image_url, sort_order, created_at')
+        .eq('product_id', productId)
+        .order('sort_order', ascending: true)
+        .order('created_at', ascending: true);
+
+    return (response as List)
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> addProductImage({
+    required String productId,
+    required String imageUrl,
+    required int sortOrder,
+  }) async {
+    final response = await supabase
+        .from('product_images')
+        .insert({
+          'product_id': productId,
+          'image_url': imageUrl,
+          'sort_order': sortOrder,
+        })
+        .select()
+        .single();
+
+    return Map<String, dynamic>.from(response);
+  }
+
+  Future<void> deleteProductImage(String imageId) async {
+    await supabase.from('product_images').delete().eq('id', imageId);
+  }
+
+  Future<void> updateProductImageOrder({
+    required String imageId,
+    required int sortOrder,
+  }) async {
+    await supabase
+        .from('product_images')
+        .update({'sort_order': sortOrder})
+        .eq('id', imageId);
+  }
+
+  Future<void> updateProductImageOrders(
+    List<Map<String, dynamic>> images,
+  ) async {
+    for (var index = 0; index < images.length; index++) {
+      await supabase
+          .from('product_images')
+          .update({'sort_order': index})
+          .eq('id', images[index]['id']);
+    }
+  }
 
   Future<List<SaleItem>> getProductSales(String productId) async {
     final response = await supabase

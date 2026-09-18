@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:jewel_admin/screens/product_media_screen.dart';
 import 'package:jewel_admin/services/storage_service.dart';
 
 import '../models/product.dart';
@@ -84,6 +85,22 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _quantityController.dispose();
     _itemCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _manageMedia() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductMediaScreen(
+          repository: widget.repository,
+          product: widget.product,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   Future<void> _pickImage() async {
@@ -603,6 +620,16 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ),
 
               const SizedBox(height: 24),
+
+              // const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isSaving ? null : _manageMedia,
+                  icon: const Icon(Icons.perm_media_outlined),
+                  label: const Text('Manage Additional Media'),
+                ),
+              ),
               const SizedBox(height: 24),
 
               SizedBox(

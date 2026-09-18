@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:jewel_admin/screens/product_media_screen.dart';
 import 'package:jewel_admin/services/storage_service.dart';
 
 import '../models/product.dart';
@@ -271,7 +272,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       if (!mounted) return;
 
-      // Return true so ProductListScreen automatically refreshes.
+      final openMediaManager = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Product Added'),
+            content: const Text(
+              'Product was added successfully.\n\n'
+              'Would you like to add additional product images or manage the video?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Done'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Manage Media'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted) return;
+
+      if (openMediaManager == true) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductMediaScreen(
+              repository: widget.repository,
+              product: createdProduct,
+            ),
+          ),
+        );
+      }
+
+      if (!mounted) return;
+
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;

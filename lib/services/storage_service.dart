@@ -88,6 +88,46 @@ class StorageService {
     return fileName.split('.').last.toLowerCase();
   }
 
+  Future<String> uploadAdditionalProductImage({
+    required String productId,
+    required File imageFile,
+  }) async {
+    final extension = _getFileExtension(imageFile.path);
+
+    final fileName = '${DateTime.now().microsecondsSinceEpoch}.$extension';
+
+    final filePath = 'products/$productId/images/$fileName';
+
+    await _supabase.storage
+        .from(_bucketName)
+        .upload(
+          filePath,
+          imageFile,
+          fileOptions: FileOptions(
+            cacheControl: '3600',
+            upsert: false,
+            contentType: _getImageContentType(extension),
+          ),
+        );
+
+    return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+  }
+
+  String _getImageContentType(String extension) {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
   String _getVideoContentType(String extension) {
     switch (extension) {
       case 'mov':

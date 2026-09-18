@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jewel_admin/screens/product_media_screen.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/product.dart';
@@ -578,25 +579,54 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  Future<void> _manageMedia() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductMediaScreen(
+          repository: widget.repository,
+          product: widget.product,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   Widget _buildActions() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
+          SizedBox(
+            width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _shareProduct,
-              icon: const Icon(Icons.share_outlined),
-              label: const Text('Share'),
+              onPressed: _manageMedia,
+              icon: const Icon(Icons.perm_media_outlined),
+              label: const Text('Manage Media'),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _editProduct,
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit'),
-            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _shareProduct,
+                  icon: const Icon(Icons.share_outlined),
+                  label: const Text('Share'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _editProduct,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:jewel_admin/screens/add_sale_screen.dart';
 import 'package:jewel_admin/screens/business_summary_screen.dart';
 import 'package:jewel_admin/screens/edit_product_screen.dart';
 import 'package:jewel_admin/screens/product_details_screen.dart';
+import 'package:jewel_admin/screens/product_media_screen.dart';
 import 'package:jewel_admin/services/whatsapp_service.dart';
 
 import '../models/product.dart';
@@ -127,6 +128,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
         _isLoading = false;
         _errorMessage = 'Unable to load products.\n$error';
       });
+    }
+  }
+
+  Future<void> _manageMedia(Product product) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            ProductMediaScreen(repository: widget.repository, product: product),
+      ),
+    );
+
+    if (result == true) {
+      await _loadProducts();
     }
   }
 
@@ -534,6 +549,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             product: product,
             showPurchasePrice: _showPurchasePrice,
             onEdit: () => _editProduct(product),
+            onManageMedia: () => _manageMedia(product),
             onDelete: () => _deleteProduct(product),
             onTap: () => _openProductDetails(product),
           );
@@ -547,6 +563,7 @@ class _ProductCard extends StatelessWidget {
   final Product product;
   final bool showPurchasePrice;
   final VoidCallback onEdit;
+  final VoidCallback onManageMedia;
   final VoidCallback onDelete;
   final VoidCallback onTap;
 
@@ -555,6 +572,7 @@ class _ProductCard extends StatelessWidget {
     required this.showPurchasePrice,
     required this.onTap,
     required this.onEdit,
+    required this.onManageMedia,
     required this.onDelete,
   });
 
@@ -673,7 +691,11 @@ class _ProductCard extends StatelessWidget {
                           onPressed: onEdit,
                           icon: const Icon(Icons.edit_outlined),
                         ),
-
+                        IconButton(
+                          tooltip: 'Manage Media',
+                          onPressed: onManageMedia,
+                          icon: const Icon(Icons.perm_media_outlined),
+                        ),
                         IconButton(
                           tooltip: 'Delete',
                           onPressed: onDelete,
