@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/product.dart';
 import '../repositories/product_repository.dart';
 
@@ -748,6 +748,81 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
     }).toList();
   }
 
+  void _showFullImage(BuildContext context, Product product) {
+    final imageUrl = product.imageUrl?.trim();
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No product image available.')),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) {
+                      return const SizedBox(
+                        height: 300,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorWidget: (context, url, error) {
+                      return Container(
+                        height: 300,
+                        width: double.infinity,
+                        color: Colors.black12,
+                        alignment: Alignment.center,
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_outlined, size: 48),
+                            SizedBox(height: 8),
+                            Text('Unable to load image'),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.black54,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: 'Close',
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final products = _filteredProducts;
@@ -824,28 +899,29 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                         final product = products[index];
 
                         return ListTile(
-                          leading: CircleAvatar(
-                            child: Text(
-                              product.itemCode.substring(
-                                0,
-                                product.itemCode.length > 2
-                                    ? 2
-                                    : product.itemCode.length,
-                              ),
-                            ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          leading: _ProductThumbnail(
+                            imageUrl: product.imageUrl,
+                            onTap: () => _showFullImage(context, product),
                           ),
                           title: Text(
                             product.productName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          subtitle: Text(
-                            '${product.itemCode} • '
-                            '${product.category}\n'
-                            'Stock: '
-                            '${product.quantity} • '
-                            'Selling price: '
-                            '₹${product.sellingPrice.toStringAsFixed(2)}',
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              '${product.itemCode} • '
+                              '${product.category}\n'
+                              'Stock: ${product.quantity} • '
+                              'Selling price: '
+                              '₹${product.sellingPrice.toStringAsFixed(2)}',
+                            ),
                           ),
                           isThreeLine: true,
                           trailing: const Icon(Icons.chevron_right),
@@ -886,6 +962,52 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProductThumbnail extends StatelessWidget {
+  final String? imageUrl;
+  final VoidCallback onTap;
+
+  const _ProductThumbnail({required this.imageUrl, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl?.trim();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 70,
+        height: 70,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: url == null || url.isEmpty
+            ? const Icon(Icons.image_not_supported_outlined, size: 30)
+            : CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (context, url) {
+                  return const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  );
+                },
+                errorWidget: (context, url, error) {
+                  return const Icon(Icons.broken_image_outlined, size: 30);
+                },
+              ),
       ),
     );
   }

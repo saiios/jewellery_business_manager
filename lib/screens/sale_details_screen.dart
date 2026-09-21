@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/sale.dart';
 import '../models/sale_item.dart';
 import '../repositories/product_repository.dart';
@@ -20,7 +20,7 @@ class SaleDetailsScreen extends StatefulWidget {
 
 class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   Sale? _sale;
-
+  final Map<String, String?> _productImageUrls = {};
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -38,7 +38,14 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
 
     try {
       final sale = await widget.repository.getSale(widget.saleId);
-
+      for (final item in sale.items) {
+        try {
+          final product = await widget.repository.getProduct(item.productId);
+          _productImageUrls[item.productId] = product.imageUrl;
+        } catch (_) {
+          _productImageUrls[item.productId] = null;
+        }
+      }
       if (!mounted) return;
 
       setState(() {
@@ -257,13 +264,24 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   }
 
   Widget _buildSaleItem(SaleItem item) {
+    final imageUrl = _productImageUrls[item.productId];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _SaleProductThumbnail(
+                  imageUrl: imageUrl,
+                  onTap: () =>
+                      _showFullImage(context, imageUrl, item.productName),
+                ),
+
+                const SizedBox(width: 12),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +293,9 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       const SizedBox(height: 4),
+
                       Text(
                         item.productName,
                         style: const TextStyle(
@@ -286,6 +306,9 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                     ],
                   ),
                 ),
+
+                const SizedBox(width: 8),
+
                 Text(
                   _formatAmount(item.lineTotal),
                   style: const TextStyle(
@@ -307,12 +330,14 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                 Expanded(
                   child: _buildItemValue('Quantity', item.quantity.toString()),
                 ),
+
                 Expanded(
                   child: _buildItemValue(
                     'Purchase',
                     _formatAmount(item.purchasePrice),
                   ),
                 ),
+
                 Expanded(
                   child: _buildItemValue(
                     'Actual Sold',
@@ -339,6 +364,100 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showFullImage(
+    BuildContext context,
+    String? imageUrl,
+    String productName,
+  ) {
+    final url = imageUrl?.trim();
+
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No product image available.')),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) {
+                      return const SizedBox(
+                        height: 300,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorWidget: (context, url, error) {
+                      return Container(
+                        height: 300,
+                        width: double.infinity,
+                        color: Colors.black12,
+                        alignment: Alignment.center,
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_outlined, size: 48),
+                            SizedBox(height: 8),
+                            Text('Unable to load image'),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.black54,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: 'Close',
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Text(
+                  productName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -436,6 +555,52 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SaleProductThumbnail extends StatelessWidget {
+  final String? imageUrl;
+  final VoidCallback onTap;
+
+  const _SaleProductThumbnail({required this.imageUrl, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl?.trim();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: url == null || url.isEmpty
+            ? const Icon(Icons.image_not_supported_outlined, size: 30)
+            : CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (context, url) {
+                  return const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  );
+                },
+                errorWidget: (context, url, error) {
+                  return const Icon(Icons.broken_image_outlined, size: 30);
+                },
+              ),
+      ),
     );
   }
 }
