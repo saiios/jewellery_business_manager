@@ -5,6 +5,7 @@ import 'package:jewel_admin/screens/business_summary_screen.dart';
 import 'package:jewel_admin/screens/edit_product_screen.dart';
 import 'package:jewel_admin/screens/product_details_screen.dart';
 import 'package:jewel_admin/screens/product_media_screen.dart';
+import 'package:jewel_admin/services/notification_service.dart';
 import 'package:jewel_admin/services/whatsapp_service.dart';
 
 import '../models/product.dart';
@@ -24,6 +25,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
   List<Product> _products = [];
 
   final TextEditingController _searchController = TextEditingController();
+
+  final NotificationService _notificationService = NotificationService();
 
   String _searchQuery = '';
 
@@ -212,6 +215,274 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
+  Future<void> _sendProductNotification(Product product) async {
+    final titleController = TextEditingController(text: '✨ New Jewellery Pick');
+
+    final messageController = TextEditingController(
+      text:
+          '${product.productName} is available now at Devi Jewels. Tap to view.',
+    );
+
+    bool isSending = false;
+
+    try {
+      await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final hasOffer = product.mrp > product.sellingPrice;
+
+              final discount = hasOffer && product.mrp > 0
+                  ? ((product.mrp - product.sellingPrice) / product.mrp * 100)
+                        .round()
+                  : 0;
+
+              return AlertDialog(
+                title: const Text('Send Product Notification?'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (product.imageUrl != null &&
+                          product.imageUrl!.trim().isNotEmpty)
+                        Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: product.imageUrl!,
+                              width: 140,
+                              height: 140,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const SizedBox(
+                                width: 140,
+                                height: 140,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 140,
+                                height: 140,
+                                color: Colors.grey.shade100,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 16),
+
+                      Text(
+                        product.productName,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        'Item: ${product.itemCode}',
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      if (hasOffer)
+                        Row(
+                          children: [
+                            Text(
+                              '₹${product.mrp.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '₹${product.sellingPrice.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$discount% OFF',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          'Price: ₹${product.sellingPrice.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+
+                      TextField(
+                        controller: titleController,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(
+                          labelText: 'Notification title',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: messageController,
+                        enabled: !isSending,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Notification message',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSending
+                        ? null
+                        : () {
+                            Navigator.pop(dialogContext, false);
+                          },
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: isSending
+                        ? null
+                        : () async {
+                            final title = titleController.text.trim();
+
+                            final message = messageController.text.trim();
+
+                            if (title.isEmpty || message.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Title and message are required.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            setDialogState(() {
+                              isSending = true;
+                            });
+
+                            try {
+                              final result = await _notificationService
+                                  .sendProductNotification(
+                                    productId: product.id,
+                                    itemCode: product.itemCode,
+                                    title: title,
+                                    message: message,
+                                  );
+
+                              if (!context.mounted) {
+                                return;
+                              }
+
+                              Navigator.pop(dialogContext, true);
+
+                              if (result.recipientCount == 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Notification saved, but no Android customers are registered for push notifications yet.',
+                                    ),
+                                  ),
+                                );
+                              } else if (result.failedCount > 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Notification sent to '
+                                      '${result.successCount} customers. '
+                                      '${result.failedCount} failed.',
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Notification sent to '
+                                      '${result.successCount} customers.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (error) {
+                              if (!context.mounted) {
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isSending = false;
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Unable to send notification: $error',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    icon: isSending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.notifications_active_outlined),
+                    label: Text(isSending ? 'Sending...' : 'Send Notification'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      titleController.dispose();
+      messageController.dispose();
+    }
+  }
+
   Future<void> _addProduct() async {
     final result = await Navigator.push(
       context,
@@ -302,7 +573,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
-
       body: Column(
         children: [
           Padding(
@@ -425,7 +695,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       ),
                     ],
                     onChanged: (value) {
-                      if (value == null) return;
+                      if (value == null) {
+                        return;
+                      }
 
                       setState(() {
                         _sortOption = value;
@@ -440,7 +712,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
           Expanded(child: _buildBody()),
         ],
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: _addProduct,
         tooltip: 'Add Product',
@@ -551,6 +822,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             onEdit: () => _editProduct(product),
             onManageMedia: () => _manageMedia(product),
             onDelete: () => _deleteProduct(product),
+            onSendNotification: () => _sendProductNotification(product),
             onTap: () => _openProductDetails(product),
           );
         },
@@ -562,9 +834,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
 class _ProductCard extends StatelessWidget {
   final Product product;
   final bool showPurchasePrice;
+
   final VoidCallback onEdit;
   final VoidCallback onManageMedia;
   final VoidCallback onDelete;
+  final VoidCallback onSendNotification;
   final VoidCallback onTap;
 
   const _ProductCard({
@@ -574,6 +848,7 @@ class _ProductCard extends StatelessWidget {
     required this.onEdit,
     required this.onManageMedia,
     required this.onDelete,
+    required this.onSendNotification,
   });
 
   @override
@@ -649,7 +924,9 @@ class _ProductCard extends StatelessWidget {
                               decoration: TextDecoration.lineThrough,
                             ),
                           ),
+
                           const SizedBox(width: 8),
+
                           Text(
                             '₹${product.sellingPrice.toStringAsFixed(0)}',
                             style: const TextStyle(
@@ -657,7 +934,9 @@ class _ProductCard extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+
                           const SizedBox(width: 8),
+
                           _DiscountBadge(
                             mrp: product.mrp,
                             sellingPrice: product.sellingPrice,
@@ -715,15 +994,23 @@ class _ProductCard extends StatelessWidget {
                         ),
 
                         IconButton(
+                          tooltip: 'Send Notification',
+                          icon: const Icon(Icons.notifications_active_outlined),
+                          onPressed: onSendNotification,
+                        ),
+
+                        IconButton(
                           tooltip: 'Edit',
                           onPressed: onEdit,
                           icon: const Icon(Icons.edit_outlined),
                         ),
+
                         IconButton(
                           tooltip: 'Manage Media',
                           onPressed: onManageMedia,
                           icon: const Icon(Icons.perm_media_outlined),
                         ),
+
                         IconButton(
                           tooltip: 'Delete',
                           onPressed: onDelete,
