@@ -29,19 +29,67 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   VideoPlayerController? _videoController;
   Future<void>? _videoInitialization;
 
+  late Product _product;
+
+  bool _productLoading = true;
+
   List<SaleItem> _sales = [];
   bool _salesLoading = true;
   String? _salesError;
 
+  /// Changes whenever we fetch the latest product.
+  ///
+  /// This is used only for image cache busting.
+  /// It does NOT change the database or the actual storage URL.
+  int _imageCacheKey = DateTime.now().millisecondsSinceEpoch;
+
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
+
+    // Show the product we already have immediately.
+    _product = widget.product;
+
+    // Then fetch the latest version from Supabase.
+    _loadLatestProduct();
+
+    // Sales history can load independently.
     _loadSalesHistory();
   }
 
+  Future<void> _loadLatestProduct() async {
+    try {
+      final latestProduct = await widget.repository.getProduct(
+        widget.product.id,
+      );
+
+      if (!mounted) return;
+
+      // Dispose an old video controller before creating a new one.
+      await _disposeVideoController();
+
+      setState(() {
+        _product = latestProduct;
+        _productLoading = false;
+        _imageCacheKey = DateTime.now().millisecondsSinceEpoch;
+      });
+
+      _initializeVideo();
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _productLoading = false;
+      });
+
+      // If fetching the latest product fails, continue using
+      // the product that was originally passed to this screen.
+      _initializeVideo();
+    }
+  }
+
   void _initializeVideo() {
-    final videoUrl = widget.product.videoUrl;
+    final videoUrl = _product.videoUrl;
 
     if (videoUrl == null || videoUrl.trim().isEmpty) {
       return;
@@ -52,11 +100,24 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     _videoInitialization = _videoController!.initialize();
   }
 
+  Future<void> _disposeVideoController() async {
+    final controller = _videoController;
+
+    _videoController = null;
+    _videoInitialization = null;
+
+    if (controller != null) {
+      await controller.dispose();
+    }
+  }
+
   Future<void> _loadSalesHistory() async {
-    setState(() {
-      _salesLoading = true;
-      _salesError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _salesLoading = true;
+        _salesError = null;
+      });
+    }
 
     try {
       final sales = await widget.repository.getProductSales(widget.product.id);
@@ -77,6 +138,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     }
   }
 
+  /// Adds a changing query parameter to the image URL.
+  ///
+  /// Supabase Storage keeps the same actual file URL, but Flutter/network
+  /// caching sees this as a fresh URL and downloads the newly uploaded image.
+  String _imageUrlWithCacheBust(String url) {
+    final separator = url.contains('?') ? '&' : '?';
+
+    return '$url${separator}v=$_imageCacheKey';
+  }
+
   @override
   void dispose() {
     _videoController?.dispose();
@@ -85,7 +156,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Future<void> _shareProduct() async {
     try {
-      await WhatsAppService.shareProduct(widget.product);
+      await WhatsAppService.shareProduct(_product);
     } catch (error) {
       if (!mounted) return;
 
@@ -99,10 +170,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProductScreen(
-          repository: widget.repository,
-          product: widget.product,
-        ),
+        builder: (context) =>
+            EditProductScreen(repository: widget.repository, product: _product),
       ),
     );
 
@@ -122,11 +191,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _openFullImage() {
-    final imageUrl = widget.product.imageUrl;
+    final imageUrl = _product.imageUrl;
 
     if (imageUrl == null || imageUrl.trim().isEmpty) {
       return;
     }
+
+    final displayUrl = _imageUrlWithCacheBust(imageUrl);
 
     Navigator.push(
       context,
@@ -143,7 +214,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 minScale: 0.8,
                 maxScale: 4.0,
                 child: Image.network(
-                  imageUrl,
+                  displayUrl,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return const Icon(
@@ -162,7 +233,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildImage() {
-    final imageUrl = widget.product.imageUrl;
+    final imageUrl = _product.imageUrl;
 
     if (imageUrl == null || imageUrl.trim().isEmpty) {
       return Container(
@@ -173,6 +244,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       );
     }
 
+    final displayUrl = _imageUrlWithCacheBust(imageUrl);
+
     return GestureDetector(
       onTap: _openFullImage,
       child: SizedBox(
@@ -182,7 +255,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           children: [
             Positioned.fill(
               child: Image.network(
-                imageUrl,
+                displayUrl,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
@@ -196,6 +269,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 },
               ),
             ),
+
             Positioned(
               right: 12,
               bottom: 12,
@@ -242,6 +316,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
+
         FutureBuilder<void>(
           future: _videoInitialization,
           builder: (context, snapshot) {
@@ -275,6 +350,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   aspectRatio: _videoController!.value.aspectRatio,
                   child: VideoPlayer(_videoController!),
                 ),
+
                 VideoProgressIndicator(
                   _videoController!,
                   allowScrubbing: true,
@@ -283,6 +359,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     vertical: 8,
                   ),
                 ),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -314,7 +391,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildInformation() {
-    final product = widget.product;
+    final product = _product;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -325,28 +402,35 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             product.productName,
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
+
           const SizedBox(height: 16),
 
           Text(
             'Item Code',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
+
           const SizedBox(height: 2),
+
           Text(
             product.itemCode,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
+
           const SizedBox(height: 14),
 
           Text(
             'Category',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
+
           const SizedBox(height: 2),
+
           Text(
             product.category,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
           ),
+
           const SizedBox(height: 14),
 
           if (widget.showPurchasePrice) ...[
@@ -354,11 +438,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               'Purchase Price',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
+
             const SizedBox(height: 2),
+
             Text(
               '₹${product.purchasePrice.toStringAsFixed(0)}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             ),
+
             const SizedBox(height: 14),
           ],
 
@@ -366,22 +453,28 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             'Selling Price',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
+
           const SizedBox(height: 2),
+
           Text(
             '₹${product.sellingPrice.toStringAsFixed(0)}',
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
+
           const SizedBox(height: 14),
 
           Text(
             'Quantity',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
+
           const SizedBox(height: 2),
+
           Text(
             '${product.quantity} pieces',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
           ),
+
           const SizedBox(height: 14),
 
           Row(
@@ -391,7 +484,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 size: 20,
                 color: product.quantity > 0 ? Colors.green : Colors.red,
               ),
+
               const SizedBox(width: 8),
+
               Text(
                 product.quantity > 0 ? 'Available' : 'Sold Out',
                 style: TextStyle(
@@ -421,6 +516,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
+
               if (_sales.isNotEmpty)
                 Text(
                   '${_sales.fold<int>(0, (sum, item) => sum + item.quantity)} sold',
@@ -431,6 +527,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 ),
             ],
           ),
+
           const SizedBox(height: 10),
 
           if (_salesLoading)
@@ -447,8 +544,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 child: Row(
                   children: [
                     const Icon(Icons.error_outline, color: Colors.red),
+
                     const SizedBox(width: 12),
-                    Expanded(child: Text('Unable to load sales history.')),
+
+                    const Expanded(
+                      child: Text('Unable to load sales history.'),
+                    ),
+
                     TextButton(
                       onPressed: _loadSalesHistory,
                       child: const Text('Retry'),
@@ -467,7 +569,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       Icons.receipt_long_outlined,
                       color: Colors.grey.shade600,
                     ),
+
                     const SizedBox(width: 12),
+
                     Expanded(
                       child: Text(
                         'No sales recorded for this product yet.',
@@ -513,6 +617,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
+
                   Text(
                     '₹${saleItem.lineTotal.toStringAsFixed(0)}',
                     style: const TextStyle(
@@ -522,11 +627,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 8),
 
               Row(
                 children: [
                   Expanded(child: Text('Qty: ${saleItem.quantity}')),
+
                   Expanded(
                     child: Text(
                       'Sold: ₹${saleItem.sellingPrice.toStringAsFixed(0)}',
@@ -537,6 +644,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               if (widget.showPurchasePrice) ...[
                 const SizedBox(height: 6),
+
                 Row(
                   children: [
                     Expanded(
@@ -544,6 +652,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         'Cost: ₹${saleItem.purchasePrice.toStringAsFixed(0)}',
                       ),
                     ),
+
                     Expanded(
                       child: Text(
                         'Profit: ₹${profit.toStringAsFixed(0)}',
@@ -568,7 +677,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+
                   const Spacer(),
+
                   const Icon(Icons.chevron_right, size: 20),
                 ],
               ),
@@ -585,7 +696,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       MaterialPageRoute(
         builder: (context) => ProductMediaScreen(
           repository: widget.repository,
-          product: widget.product,
+          product: _product,
         ),
       ),
     );
@@ -608,7 +719,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               label: const Text('Manage Media'),
             ),
           ),
+
           const SizedBox(height: 12),
+
           Row(
             children: [
               Expanded(
@@ -618,7 +731,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   label: const Text('Share'),
                 ),
               ),
+
               const SizedBox(width: 12),
+
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _editProduct,
@@ -638,7 +753,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Product Details')),
       body: RefreshIndicator(
-        onRefresh: _loadSalesHistory,
+        onRefresh: () async {
+          await Future.wait([_loadLatestProduct(), _loadSalesHistory()]);
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(

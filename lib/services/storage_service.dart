@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StorageService {
@@ -9,22 +10,111 @@ class StorageService {
 
   static const String _bucketName = 'jewellery-media';
 
+  /// Compresses an image before uploading.
+  ///
+  /// - Maximum dimension: 1200px
+  /// - JPEG quality: 82
+  /// - Output format: JPEG
+  ///
+  /// Returns the compressed temporary file.
+  Future<File> _compressImage(File imageFile) async {
+    final originalPath = imageFile.path;
+
+    final tempPath =
+        '${Directory.systemTemp.path}/compressed_${DateTime.now().microsecondsSinceEpoch}.jpg';
+
+    final compressedBytes = await FlutterImageCompress.compressWithFile(
+      originalPath,
+      minWidth: 1200,
+      minHeight: 1200,
+      quality: 82,
+      format: CompressFormat.jpeg,
+      keepExif: false,
+    );
+
+    if (compressedBytes == null || compressedBytes.isEmpty) {
+      // If compression fails, use the original file.
+      return imageFile;
+    }
+
+    final compressedFile = File(tempPath);
+    await compressedFile.writeAsBytes(compressedBytes, flush: true);
+
+    return compressedFile;
+  }
+
   Future<String> uploadProductImage({
     required String productId,
     required File imageFile,
   }) async {
-    final extension = _getFileExtension(imageFile.path);
-    final filePath = 'products/$productId/image.$extension';
+    File? compressedFile;
 
-    await _supabase.storage
-        .from(_bucketName)
-        .upload(
-          filePath,
-          imageFile,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-        );
+    try {
+      compressedFile = await _compressImage(imageFile);
 
-    return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+      const extension = 'jpg';
+      final filePath = 'products/$productId/image.$extension';
+
+      await _supabase.storage
+          .from(_bucketName)
+          .upload(
+            filePath,
+            compressedFile,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+
+      return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+    } finally {
+      // Do not delete the original image.
+      if (compressedFile != null && compressedFile.path != imageFile.path) {
+        try {
+          await compressedFile.delete();
+        } catch (_) {
+          // Ignore temporary file cleanup errors.
+        }
+      }
+    }
+  }
+
+  Future<String> uploadAdditionalProductImage({
+    required String productId,
+    required File imageFile,
+  }) async {
+    File? compressedFile;
+
+    try {
+      compressedFile = await _compressImage(imageFile);
+
+      final fileName = '${DateTime.now().microsecondsSinceEpoch}.jpg';
+
+      final filePath = 'products/$productId/images/$fileName';
+
+      await _supabase.storage
+          .from(_bucketName)
+          .upload(
+            filePath,
+            compressedFile,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: false,
+              contentType: 'image/jpeg',
+            ),
+          );
+
+      return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+    } finally {
+      if (compressedFile != null && compressedFile.path != imageFile.path) {
+        try {
+          await compressedFile.delete();
+        } catch (_) {
+          // Ignore temporary file cleanup errors.
+        }
+      }
+    }
   }
 
   Future<String> uploadProductVideo({
@@ -86,31 +176,6 @@ class StorageService {
     }
 
     return fileName.split('.').last.toLowerCase();
-  }
-
-  Future<String> uploadAdditionalProductImage({
-    required String productId,
-    required File imageFile,
-  }) async {
-    final extension = _getFileExtension(imageFile.path);
-
-    final fileName = '${DateTime.now().microsecondsSinceEpoch}.$extension';
-
-    final filePath = 'products/$productId/images/$fileName';
-
-    await _supabase.storage
-        .from(_bucketName)
-        .upload(
-          filePath,
-          imageFile,
-          fileOptions: FileOptions(
-            cacheControl: '3600',
-            upsert: false,
-            contentType: _getImageContentType(extension),
-          ),
-        );
-
-    return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
   }
 
   String _getImageContentType(String extension) {
