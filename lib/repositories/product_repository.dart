@@ -1,16 +1,21 @@
+import 'package:jewel_admin/models/customer_order_status_update.dart';
 import 'package:jewel_admin/models/inventory_summary.dart';
 import 'package:jewel_admin/models/sale.dart';
 import 'package:jewel_admin/models/sale_item.dart';
 import 'package:jewel_admin/services/storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import '../models/customer_order_admin.dart';
 import '../models/product.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProductRepository {
   final SupabaseClient supabase;
 
   ProductRepository(this.supabase);
-
+  static const String _adminKey = String.fromEnvironment(
+    'NOTIFICATION_ADMIN_KEY',
+    defaultValue: '',
+  );
   // ============================================================
   // PRODUCTS
   // ============================================================
@@ -334,5 +339,163 @@ class ProductRepository {
     await storageService.deleteProductMedia(product.videoUrl);
 
     await supabase.from('products').delete().eq('id', id);
+  }
+  // ============================================================
+  // CUSTOMER ORDERS - READ ONLY
+  // ============================================================
+
+  Future<List<CustomerOrderAdmin>> getCustomerOrders() async {
+    if (_adminKey.trim().isEmpty) {
+      throw Exception(
+        'Notification admin key is not configured. '
+        'Run the app with '
+        '--dart-define=NOTIFICATION_ADMIN_KEY=...',
+      );
+    }
+
+    final response = await supabase.functions.invoke(
+      'get-admin-customer-orders',
+      headers: {'x-notification-admin-key': _adminKey},
+      body: {},
+    );
+
+    final data = response.data;
+
+    if (data is! Map) {
+      throw Exception('Invalid response from customer orders service.');
+    }
+
+    final success = data['success'] == true;
+
+    if (!success) {
+      final error = data['error']?.toString().trim();
+
+      throw Exception(
+        error == null || error.isEmpty
+            ? 'Unable to load customer orders.'
+            : error,
+      );
+    }
+
+    final ordersData = data['orders'];
+
+    if (ordersData is! List) {
+      throw Exception('Customer orders response is invalid.');
+    }
+
+    return ordersData
+        .whereType<Map>()
+        .map(
+          (item) => CustomerOrderAdmin.fromMap(Map<String, dynamic>.from(item)),
+        )
+        .toList();
+  }
+
+  Future<CustomerOrderAdmin> getCustomerOrder(String orderId) async {
+    if (_adminKey.trim().isEmpty) {
+      throw Exception(
+        'Notification admin key is not configured. '
+        'Run the app with '
+        '--dart-define=NOTIFICATION_ADMIN_KEY=...',
+      );
+    }
+
+    final response = await supabase.functions.invoke(
+      'get-admin-customer-orders',
+      headers: {'x-notification-admin-key': _adminKey},
+      body: {},
+    );
+
+    final data = response.data;
+
+    if (data is! Map) {
+      throw Exception('Invalid response from customer orders service.');
+    }
+
+    final success = data['success'] == true;
+
+    if (!success) {
+      final error = data['error']?.toString().trim();
+
+      throw Exception(
+        error == null || error.isEmpty
+            ? 'Unable to load customer orders.'
+            : error,
+      );
+    }
+
+    final ordersData = data['orders'];
+
+    if (ordersData is! List) {
+      throw Exception('Customer orders response is invalid.');
+    }
+
+    final matchingOrders = ordersData
+        .whereType<Map>()
+        .map(
+          (item) => CustomerOrderAdmin.fromMap(Map<String, dynamic>.from(item)),
+        )
+        .where((order) => order.id == orderId)
+        .toList();
+
+    if (matchingOrders.isEmpty) {
+      throw Exception('Customer order not found.');
+    }
+
+    return matchingOrders.first;
+  }
+
+  Future<CustomerOrderStatusUpdate> updateCustomerOrderStatus({
+    required String orderId,
+    required String status,
+  }) async {
+    final adminKey = const String.fromEnvironment(
+      'NOTIFICATION_ADMIN_KEY',
+      defaultValue: '',
+    ).trim();
+
+    if (adminKey.isEmpty) {
+      throw Exception(
+        'Notification admin key is not configured. '
+        'Run the app with '
+        '--dart-define=NOTIFICATION_ADMIN_KEY=...',
+      );
+    }
+
+    final response = await supabase.functions.invoke(
+      'update-admin-customer-order-status',
+      headers: {'x-notification-admin-key': adminKey},
+      body: {'order_id': orderId, 'status': status},
+    );
+
+    final data = response.data;
+
+    if (data is! Map) {
+      throw Exception('Invalid response from order status service.');
+    }
+
+    final result = Map<String, dynamic>.from(data);
+
+    final success = result['success'] == true;
+
+    if (!success) {
+      final error = result['error']?.toString().trim();
+
+      throw Exception(
+        error == null || error.isEmpty
+            ? 'Unable to update order status.'
+            : error,
+      );
+    }
+
+    final orderData = result['order'];
+
+    if (orderData is! Map) {
+      throw Exception('Invalid order returned by status service.');
+    }
+
+    return CustomerOrderStatusUpdate.fromMap(
+      Map<String, dynamic>.from(orderData),
+    );
   }
 }

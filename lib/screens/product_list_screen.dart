@@ -7,7 +7,7 @@ import 'package:jewel_admin/screens/product_details_screen.dart';
 import 'package:jewel_admin/screens/product_media_screen.dart';
 import 'package:jewel_admin/services/notification_service.dart';
 import 'package:jewel_admin/services/whatsapp_service.dart';
-
+import 'package:jewel_admin/screens/customer_orders_screen.dart';
 import '../models/product.dart';
 import '../repositories/product_repository.dart';
 import 'add_product_screen.dart';
@@ -533,7 +533,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ),
             ],
           ),
-
+          IconButton(
+            tooltip: 'Customer Orders',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      CustomerOrdersScreen(repository: widget.repository),
+                ),
+              );
+            },
+            icon: const Icon(Icons.shopping_bag_outlined),
+          ),
           IconButton(
             tooltip: 'New Sale',
             onPressed: () async {
