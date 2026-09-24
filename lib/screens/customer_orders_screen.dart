@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
-import 'customer_order_details_screen.dart';
+
 import '../models/customer_order_admin.dart';
 import '../repositories/product_repository.dart';
+import 'customer_order_details_screen.dart';
 
 class CustomerOrdersScreen extends StatefulWidget {
   final ProductRepository repository;
+  final String? initialOrderId;
 
-  const CustomerOrdersScreen({super.key, required this.repository});
+  const CustomerOrdersScreen({
+    super.key,
+    required this.repository,
+    this.initialOrderId,
+  });
 
   @override
   State<CustomerOrdersScreen> createState() => _CustomerOrdersScreenState();
@@ -18,6 +24,18 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  int _selectedTab = 0;
+
+  static const List<_OrderFilter> _filters = [
+    _OrderFilter(label: 'All', icon: Icons.all_inbox_outlined),
+    _OrderFilter(label: 'New', icon: Icons.fiber_new_outlined),
+    _OrderFilter(label: 'Processing', icon: Icons.inventory_2_outlined),
+    _OrderFilter(label: 'Ready', icon: Icons.inventory_outlined),
+    _OrderFilter(label: 'Shipped', icon: Icons.local_shipping_outlined),
+    _OrderFilter(label: 'Delivered', icon: Icons.check_circle_outline),
+    _OrderFilter(label: 'Cancelled', icon: Icons.cancel_outlined),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -25,10 +43,12 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
   }
 
   Future<void> _loadOrders() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final orders = await widget.repository.getCustomerOrders();
@@ -41,6 +61,16 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
         _orders = orders;
         _isLoading = false;
       });
+
+      // If notification tap supplied a specific order,
+      // open it after the list has loaded.
+      final initialOrderId = widget.initialOrderId?.trim();
+
+      if (initialOrderId != null && initialOrderId.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _openInitialOrder(initialOrderId);
+        });
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -53,8 +83,109 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     }
   }
 
+  void _openInitialOrder(String orderId) {
+    if (!mounted) {
+      return;
+    }
+
+    CustomerOrderAdmin? matchingOrder;
+
+    for (final order in _orders) {
+      if (order.id == orderId) {
+        matchingOrder = order;
+        break;
+      }
+    }
+
+    if (matchingOrder == null) {
+      // The notification may contain an order that is no longer
+      // available in the returned list.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The order could not be found in the order list.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CustomerOrderDetailsScreen(order: matchingOrder!),
+      ),
+    );
+  }
+
+  List<CustomerOrderAdmin> get _filteredOrders {
+    if (_selectedTab == 0) {
+      return _orders;
+    }
+
+    return _orders.where((order) {
+      final status = order.status.trim().toLowerCase();
+
+      switch (_selectedTab) {
+        case 1:
+          // New orders.
+          return status == 'pending_payment' || status == 'confirmed';
+
+        case 2:
+          return status == 'processing';
+
+        case 3:
+          return status == 'ready_to_ship';
+
+        case 4:
+          return status == 'shipped';
+
+        case 5:
+          return status == 'delivered';
+
+        case 6:
+          return status == 'cancelled';
+
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  int _countForTab(int tab) {
+    if (tab == 0) {
+      return _orders.length;
+    }
+
+    return _orders.where((order) {
+      final status = order.status.trim().toLowerCase();
+
+      switch (tab) {
+        case 1:
+          return status == 'pending_payment' || status == 'confirmed';
+
+        case 2:
+          return status == 'processing';
+
+        case 3:
+          return status == 'ready_to_ship';
+
+        case 4:
+          return status == 'shipped';
+
+        case 5:
+          return status == 'delivered';
+
+        case 6:
+          return status == 'cancelled';
+
+        default:
+          return false;
+      }
+    }).length;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final orders = _filteredOrders;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customer Orders'),
@@ -66,11 +197,53 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(child: _buildBody(orders)),
+        ],
+      ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildFilterBar() {
+    return SizedBox(
+      height: 76,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        scrollDirection: Axis.horizontal,
+        itemCount: _filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = _filters[index];
+          final selected = _selectedTab == index;
+          final count = _countForTab(index);
+
+          return ChoiceChip(
+            selected: selected,
+            avatar: Icon(
+              filter.icon,
+              size: 18,
+              color: selected ? Colors.white : Colors.grey.shade700,
+            ),
+            label: Text('${filter.label} $count'),
+            selectedColor: Theme.of(context).colorScheme.primary,
+            onSelected: (_) {
+              setState(() {
+                _selectedTab = index;
+              });
+            },
+            labelStyle: TextStyle(
+              color: selected ? Colors.white : Colors.grey.shade800,
+              fontWeight: FontWeight.w600,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody(List<CustomerOrderAdmin> orders) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -96,19 +269,28 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
       );
     }
 
-    if (_orders.isEmpty) {
+    if (orders.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadOrders,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 180),
-            Icon(Icons.shopping_bag_outlined, size: 64),
-            SizedBox(height: 16),
+          children: [
+            const SizedBox(height: 160),
+            Icon(
+              _filters[_selectedTab].icon,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
             Center(
               child: Text(
-                'No customer orders yet',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                _selectedTab == 0
+                    ? 'No customer orders yet'
+                    : 'No ${_filters[_selectedTab].label.toLowerCase()} orders',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -119,10 +301,10 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     return RefreshIndicator(
       onRefresh: _loadOrders,
       child: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: _orders.length,
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+        itemCount: orders.length,
         itemBuilder: (context, index) {
-          final order = _orders[index];
+          final order = orders[index];
 
           return _OrderCard(
             order: order,
@@ -139,6 +321,13 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
       ),
     );
   }
+}
+
+class _OrderFilter {
+  final String label;
+  final IconData icon;
+
+  const _OrderFilter({required this.label, required this.icon});
 }
 
 class _OrderCard extends StatelessWidget {
@@ -174,7 +363,10 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _StatusBadge(text: status, color: _statusColor(status)),
+                  _StatusBadge(
+                    text: _displayStatus(status),
+                    color: _statusColor(status),
+                  ),
                 ],
               ),
 
@@ -192,7 +384,7 @@ class _OrderCard extends StatelessWidget {
                 Text(order.addressPhone),
               ],
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               Row(
                 children: [
@@ -242,6 +434,34 @@ class _OrderCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _displayStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending_payment':
+        return 'Payment Pending';
+
+      case 'ready_to_ship':
+        return 'Ready to Ship';
+
+      case 'confirmed':
+        return 'Confirmed';
+
+      case 'processing':
+        return 'Processing';
+
+      case 'shipped':
+        return 'Shipped';
+
+      case 'delivered':
+        return 'Delivered';
+
+      case 'cancelled':
+        return 'Cancelled';
+
+      default:
+        return status;
+    }
   }
 
   Color _statusColor(String status) {

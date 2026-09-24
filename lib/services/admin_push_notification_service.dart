@@ -20,16 +20,24 @@ final FlutterLocalNotificationsPlugin adminLocalNotifications =
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
-  // When the app is in the background, Android/Firebase
-  // displays notification messages automatically.
+  // When the app is in the background, Firebase/Android displays
+  // notification messages automatically.
   //
-  // We don't perform Supabase/UI work here.
+  // Do not perform Supabase/UI navigation work here.
 }
 
 class AdminPushNotificationService {
-  AdminPushNotificationService({required this.supabase});
+  AdminPushNotificationService({
+    required this.supabase,
+    this.onOrderNotificationTap,
+  });
 
   final SupabaseClient supabase;
+
+  /// Called when the admin taps an order notification.
+  ///
+  /// The value is customer_orders.id.
+  final Future<void> Function(String orderId)? onOrderNotificationTap;
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
@@ -39,19 +47,55 @@ class AdminPushNotificationService {
   );
 
   Future<void> initialize() async {
-    // Admin push is Android-only for now.
+    // This implementation is intentionally Android-only.
     //
-    // This avoids Firebase/APNs initialization requirements
-    // on the older Mac/Xcode environment.
+    // Your current Mac/Xcode environment cannot support the Firebase
+    // iOS SDK version required by the newer FlutterFire packages.
     if (!Platform.isAndroid) {
       return;
     }
 
+    // ------------------------------------------------------------
+    // LOCAL NOTIFICATIONS
+    // ------------------------------------------------------------
+
     await _initializeLocalNotifications();
+
+    // ------------------------------------------------------------
+    // FCM PERMISSION
+    // ------------------------------------------------------------
 
     await _requestPermission();
 
+    // ------------------------------------------------------------
+    // FOREGROUND MESSAGE
+    // ------------------------------------------------------------
+
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+
+    // ------------------------------------------------------------
+    // BACKGROUND -> APP OPENED BY NOTIFICATION TAP
+    // ------------------------------------------------------------
+
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+    // ------------------------------------------------------------
+    // TERMINATED -> APP OPENED BY NOTIFICATION TAP
+    // ------------------------------------------------------------
+
+    final initialMessage = await _messaging.getInitialMessage();
+
+    if (initialMessage != null) {
+      // Give Flutter a moment to finish building the app before
+      // asking the navigation callback to open an order.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      await _handleNotificationTap(initialMessage);
+    }
+
+    // ------------------------------------------------------------
+    // REGISTER CURRENT FCM TOKEN
+    // ------------------------------------------------------------
 
     try {
       final token = await _messaging.getToken();
@@ -60,8 +104,14 @@ class AdminPushNotificationService {
         await _registerToken(token);
       }
     } catch (e) {
-      print('Admin initial push token registration failed: $e');
+      // Notification registration failure must not prevent
+      // the Admin app from starting.
+      print('Admin push token registration failed: $e');
     }
+
+    // ------------------------------------------------------------
+    // TOKEN REFRESH
+    // ------------------------------------------------------------
 
     _messaging.onTokenRefresh.listen((token) async {
       if (token.trim().isEmpty) {
@@ -96,19 +146,6 @@ class AdminPushNotificationService {
     await androidPlugin?.createNotificationChannel(adminNotificationChannel);
   }
 
-  void _handleLocalNotificationTap(NotificationResponse response) {
-    final payload = response.payload;
-
-    if (payload == null || payload.isEmpty) {
-      return;
-    }
-
-    print('Admin notification tapped: $payload');
-
-    // We will connect this to CustomerOrderDetailsScreen
-    // after the notification delivery itself is verified.
-  }
-
   Future<void> _requestPermission() async {
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -137,7 +174,7 @@ class AdminPushNotificationService {
         'You have a new notification.';
 
     await adminLocalNotifications.show(
-      id: message.hashCode,
+      id: _notificationId(message),
       title: title,
       body: body,
       notificationDetails: const NotificationDetails(
@@ -152,6 +189,67 @@ class AdminPushNotificationService {
       ),
       payload: _payloadFromMessage(message),
     );
+  }
+
+  int _notificationId(RemoteMessage message) {
+    final messageId = message.messageId;
+
+    if (messageId != null && messageId.isNotEmpty) {
+      return messageId.hashCode & 0x7fffffff;
+    }
+
+    return DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
+  }
+
+  Future<void> _handleNotificationTap(RemoteMessage message) async {
+    final payload = _payloadFromMessage(message);
+
+    if (payload == null || payload.isEmpty) {
+      return;
+    }
+
+    await _handlePayload(payload);
+  }
+
+  Future<void> _handleLocalNotificationTap(
+    NotificationResponse response,
+  ) async {
+    final payload = response.payload;
+
+    if (payload == null || payload.isEmpty) {
+      return;
+    }
+
+    await _handlePayload(payload);
+  }
+
+  Future<void> _handlePayload(String payload) async {
+    if (!payload.startsWith('order:')) {
+      return;
+    }
+
+    // IMPORTANT:
+    // substring() requires an integer index.
+    //
+    // Correct:
+    // payload.substring('order:'.length)
+    final orderId = payload.substring('order:'.length).trim();
+
+    if (orderId.isEmpty) {
+      return;
+    }
+
+    final callback = onOrderNotificationTap;
+
+    if (callback == null) {
+      print(
+        'Admin order notification tapped, '
+        'but no navigation callback is configured.',
+      );
+      return;
+    }
+
+    await callback(orderId);
   }
 
   String? _payloadFromMessage(RemoteMessage message) {
@@ -199,5 +297,7 @@ class AdminPushNotificationService {
         result['error']?.toString() ?? 'Unable to register admin push token.',
       );
     }
+
+    print('Admin FCM token registered successfully.');
   }
 }
