@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "251114790454",
+    "project_id": "devi-jewels",
+    "storage_bucket": "devi-jewels.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:251114790454:android:19ea2f05447e19432a4297",
+        "android_client_info": {
+          "package_name": "com.example.jewel_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgwde_BU3i5sq29anfGrn6zk6m6sfKE4g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:251114790454:android:5a4805023edf02e72a4297",
+        "android_client_info": {
+          "package_name": "com.example.jewel_customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgwde_BU3i5sq29anfGrn6zk6m6sfKE4g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
