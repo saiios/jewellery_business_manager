@@ -11,11 +11,14 @@ import 'package:jewel_admin/screens/customer_orders_screen.dart';
 import '../models/product.dart';
 import '../repositories/product_repository.dart';
 import 'add_product_screen.dart';
+import 'product_categories_screen.dart';
+import '../repositories/product_category_repository.dart';
 
 class ProductListScreen extends StatefulWidget {
   final ProductRepository repository;
+  final ProductCategoryRepository categoryRepository;
 
-  const ProductListScreen({super.key, required this.repository});
+  const ProductListScreen({super.key, required this.repository, required this.categoryRepository});
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
@@ -41,26 +44,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   String _sortOption = 'Newest';
 
-  static const List<String> _categories = [
-    'Earrings',
-    'Jhumkas',
-    'Necklaces',
-    'Necklace Sets',
-    'Bangles',
-    'Bracelets',
-    'Rings',
-    'Black Beads',
-    'Mangalsutra',
-    'Temple Jewellery',
-    'Antique Jewellery',
-    'Bridal',
-    'Other',
-  ];
+  List<String> _categories = [];
+
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _loadCategories();
   }
 
   @override
@@ -107,6 +98,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
 
     return filtered;
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await widget.repository.getActiveCategoryNames();
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        if (_selectedCategory != null && !_categories.contains(_selectedCategory)) _selectedCategory = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load categories. Apply the category database migration first. $error')));
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -519,6 +524,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
       appBar: AppBar(
         title: const Text('Jewellery Products'),
         actions: [
+          IconButton(
+            tooltip: 'Manage Categories',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductCategoriesScreen(repository: widget.categoryRepository),
+                ),
+              );
+              await _loadCategories();
+            },
+            icon: const Icon(Icons.category_outlined),
+          ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [

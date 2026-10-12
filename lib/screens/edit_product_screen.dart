@@ -39,21 +39,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   bool _removeImage = false;
   bool _removeVideo = false;
-  static const List<String> _categories = [
-    'Earrings',
-    'Jhumkas',
-    'Necklaces',
-    'Necklace Sets',
-    'Bangles',
-    'Bracelets',
-    'Rings',
-    'Black Beads',
-    'Mangalsutra',
-    'Temple Jewellery',
-    'Antique Jewellery',
-    'Bridal',
-    'Other',
-  ];
+  List<String> _categories = ['Other'];
+  bool _categoriesLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +65,39 @@ class _EditProductScreenState extends State<EditProductScreen> {
     );
     _itemCodeController.text = widget.product.itemCode;
     _selectedCategory = widget.product.category;
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await widget.repository.getActiveCategoryNames();
+      if (!mounted) return;
+      setState(() {
+        _categories = [...categories];
+        // Keep a legacy category selectable if it has not yet been migrated into the category table.
+        if (!_categories.contains(widget.product.category))
+          _categories.add(widget.product.category);
+        if (!_categories.contains(_selectedCategory))
+          _selectedCategory = _categories.isNotEmpty
+              ? _categories.first
+              : widget.product.category;
+        _categoriesLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (!_categories.contains(widget.product.category))
+          _categories.add(widget.product.category);
+        _categoriesLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load categories. Apply the category database migration first. $error',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -428,10 +449,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: const InputDecoration(
+                initialValue: _categories.contains(_selectedCategory)
+                    ? _selectedCategory
+                    : null,
+                decoration: InputDecoration(
                   labelText: 'Category',
-                  border: OutlineInputBorder(),
+                  helperText: _categoriesLoading ? 'Loading categories…' : null,
+                  border: const OutlineInputBorder(),
                 ),
                 items: _categories.map((category) {
                   return DropdownMenuItem<String>(
@@ -439,15 +463,17 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     child: Text(category),
                   );
                 }).toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
+                onChanged: _categoriesLoading
+                    ? null
+                    : (value) {
+                        if (value == null) {
+                          return;
+                        }
 
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
+                        setState(() {
+                          _selectedCategory = value;
+                        });
+                      },
               ),
               const SizedBox(height: 16),
 

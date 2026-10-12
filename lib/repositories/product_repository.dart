@@ -29,6 +29,17 @@ class ProductRepository {
     return (response as List).map((item) => Product.fromMap(item)).toList();
   }
 
+  Future<List<String>> getActiveCategoryNames() async {
+    final rows = await supabase
+        .from('product_categories')
+        .select('name')
+        .eq('is_active', true)
+        .eq('is_group', false)
+        .order('display_order')
+        .order('name');
+    return (rows as List).map((row) => row['name'] as String).toList();
+  }
+
   Future<Product> getProduct(String id) async {
     final response = await supabase
         .from('products')
